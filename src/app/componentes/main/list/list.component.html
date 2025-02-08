@@ -1,0 +1,50 @@
+<div class="container">
+  <h2>LISTADO DE PRODUCTOS</h2>
+  <br>
+  <p *ngIf="products.length === 0">Nada listado</p>
+  
+  <ul>
+    <li *ngFor="let product of products; let i = index">
+      <strong>{{ product.name }}</strong> - Tipo: {{ product.type }}
+ 
+      <p>
+        {{ showMore[i] ? product.details : (product.details | slice:0:50) }}
+        <span *ngIf="!showMore[i] && product.details.length > 50">...</span>
+      </p>
+      
+      <button *ngIf="product.details.length > 50" (click)="toggleShowMore(i)">
+        {{ showMore[i] ? 'Ver Menos' : 'Ver Más' }}
+      </button>
+
+
+      <button (click)="deleteProduct(i)">Eliminar</button>
+      <button (click)="loadProductForEdit(i)">Editar</button>
+    </li>
+  </ul>
+
+  <h3>{{ editingIndex !== null ? 'Editar Producto' : 'Agregar Producto' }}</h3>
+  
+
+  <form (ngSubmit)="saveProduct()">
+    <input
+      [(ngModel)]="product.name"
+      name="name"
+      placeholder="Nombre del producto"
+      required
+    />
+
+    <select [(ngModel)]="product.type" name="type" required>
+      <option *ngFor="let type of tiposProducto" [value]="type">{{ type }}</option>
+    </select>
+
+   
+    <textarea
+    [(ngModel)]="product.details"
+    name="details"
+    placeholder="Detalles del producto"
+    class="single-line-textarea"
+  ></textarea>
+
+    <button type="submit">{{ editingIndex !== null ? 'Actualizar' : 'Agregar' }}</button>
+  </form>
+</div>
