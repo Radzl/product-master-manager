@@ -1,56 +1,130 @@
-import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Product, ProductService } from '../../../product.service'; // Ajusta la ruta según tu estructura
+import { FormGroup, FormControl, Validators } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-list',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
   templateUrl: './list.component.html',
-  styleUrls: ['./list.component.css']
+  styleUrls: ['./list.component.css'],
+  standalone: true,
+  imports: [CommonModule, FormsModule, ReactiveFormsModule],
 })
 export class ListComponent implements OnInit {
+  products: Product[] = [];
   showMore: boolean[] = [];
   tiposProducto: string[] = ['PC', 'Portátil', 'Tablet'];
-
-  products: { id: number; name: string; type: string; details: string }[] = [
-    { id: 1, name: 'Asus ROG STRIX G15', type: 'Portátil', details: 'Nuevo: El ASUS ROG G15 es un potente laptop gaming que pertenece a la serie Republic of Gamers (ROG) de ASUS, diseñada específicamente para jugadores y usuarios que necesitan un rendimiento de alto nivel para tareas intensivas, como juegos, edición de video y diseño gráfico.' },
-    { id: 2, name: 'Acer Nitro', type: 'Portátil', details: 'Nuevo: El Acer Nitro es una serie de laptops y PCs de escritorio diseñadas específicamente para gamers y usuarios que buscan una máquina potente para tareas como juegos, edición de video y otras aplicaciones gráficas intensivas. Acer ha desarrollado esta serie con un enfoque en ofrecer un buen rendimiento a un precio competitivo, lo que la convierte en una opción popular para los gamers que no necesariamente quieren gastar tanto como en modelos de gama alta.' },
-    { id: 3, name: 'Lenovo IdeaPad 3', type: 'Portátil', details: 'Seminuevo: El Lenovo IdeaPad 3 es una serie de laptops diseñadas para ofrecer un rendimiento equilibrado a un precio asequible. Es una opción popular para usuarios que buscan una computadora portátil económica para tareas cotidianas como navegar por internet, ver videos, trabajar en documentos y realizar tareas escolares o de oficina.' }
-  ];
-  
-  product: { id: number; name: string; type: string; details: string } = { id: 0, name: '', type: '', details: '' };
+  // Para saber si se está editando (guardamos el índice o el id)
   editingIndex: number | null = null;
 
+  // Formulario reactivo para el producto
+  productForm!: FormGroup;
+
+  constructor(private productService: ProductService) {}
+
   ngOnInit(): void {
-    this.showMore = new Array(this.products.length).fill(false);  
+    this.initializeForm();
+    this.loadProducts();
   }
 
-  deleteProduct(index: number) {
-    this.products.splice(index, 1);
-    this.showMore = new Array(this.products.length).fill(false);
+  // Inicializa el formulario reactivo con validadores (puedes agregar más si lo requieres)
+  initializeForm(): void {
+    this.productForm = new FormGroup({
+      name: new FormControl('', Validators.required),
+      type: new FormControl('', Validators.required),
+      details: new FormControl('', Validators.required)
+    });
   }
 
-  toggleShowMore(index: number) {
+  // Carga la lista de productos desde la API
+  loadProducts(): void {
+    this.productService.getProducts().subscribe(
+      (data: Product[]) => {
+        this.products = data;
+        this.showMore = new Array(this.products.length).fill(false);
+      },
+      (error) => console.error('Error al cargar productos:', error)
+    );
+  }
+
+  // Alterna la visualización de detalles completos o resumidos
+  toggleShowMore(index: number): void {
     this.showMore[index] = !this.showMore[index];
   }
 
-  loadProductForEdit(index: number) {
-    const productToEdit = this.products[index];
-    this.product = { ...productToEdit };
+  // Prepara el formulario para editar un producto existente
+  loadProductForEdit(index: number): void {
     this.editingIndex = index;
+    const product = this.products[index];
+    // Rellenamos el formulario con los datos del producto
+    this.productForm.patchValue({
+      name: product.name,
+      type: product.type,
+      details: product.details
+    });
   }
 
-  saveProduct() {
-    if (this.editingIndex !== null) {
-      this.products[this.editingIndex] = { ...this.product };
-    } else {
-      this.products.push(this.product);
-    }
+  // Guarda el producto: crea uno nuevo o actualiza uno existente
+  saveProduct(): void {
+    const formValue = this.productForm.value;
 
-    this.product = { id: 0, name: '', type: '', details: '' };
+    if (this.editingIndex !== null) {
+      // Actualizar producto
+      const productId = this.products[this.editingIndex].id;
+      if (productId !== undefined) {
+        const productToUpdate: Product = {
+          id: productId,
+          name: formValue.name,
+          type: formValue.type,
+          details: formValue.details
+        };
+
+        this.productService.editProduct(productId, productToUpdate).subscribe(
+          (response) => {
+            console.log('Producto actualizado:', response);
+            this.resetForm();
+            this.loadProducts(); // Recarga la lista actualizada
+          },
+          (error) => console.error('Error al actualizar producto:', error)
+        );
+      }
+    } else {
+      // Crear nuevo producto
+      const newProduct: Product = {
+        name: formValue.name,
+        type: formValue.type,
+        details: formValue.details
+      };
+
+      this.productService.addProduct(newProduct).subscribe(
+        (response) => {
+          console.log('Producto agregado:', response);
+          this.resetForm();
+          this.loadProducts(); // Recarga la lista con el nuevo producto
+        },
+        (error) => console.error('Error al agregar producto:', error)
+      );
+    }
+  }
+
+  // Elimina un producto mediante la API
+  deleteProduct(index: number): void {
+    const productId = this.products[index].id;
+    if (productId !== undefined) {
+      this.productService.deleteProduct(productId).subscribe(
+        (response) => {
+          console.log('Producto eliminado:', response);
+          this.loadProducts(); // Recarga la lista después de eliminar
+        },
+        (error) => console.error('Error al eliminar producto:', error)
+      );
+    }
+  }
+
+  // Reinicia el formulario y el modo de edición
+  resetForm(): void {
+    this.productForm.reset();
     this.editingIndex = null;
-    this.showMore = new Array(this.products.length).fill(false); 
   }
 }
